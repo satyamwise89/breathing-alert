@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Breathing Compass Alert - Final Logic</title>
+    <title>Breathing Compass Alert - Fixed Stability</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
         body { font-family: Arial, sans-serif; text-align: center; padding: 20px; background: #f4f4f9; }
@@ -157,9 +157,9 @@
                 document.getElementById("status").innerText = "Status: Breathing detected... Good!";
                 document.getElementById("status").style.color = "green";
             } 
-            // 2. Absolute Stillness / Breath Retention: Jab phone bilkul stable ho (change < 2.0) -> Beep NAHI bajni chahiye
+            // 2. Absolute Stillness / Breath Retention: Jab change 2.0 se kam ho (stable ho) -> Timer lagataar refresh hoga, beep NAHI bajegi
             else if (deltaChange < 2.0) {
-                lastValidBreathTime = Date.now(); // Timer reset rakho taaki beep na baje
+                lastValidBreathTime = Date.now(); // Yahin par fix kiya hai taaki timer expire na ho
                 document.getElementById("status").innerText = "Status: Deep Stillness / Breath Retention...";
                 document.getElementById("status").style.color = "purple";
             }
