@@ -4,9 +4,10 @@
     <title>Breathing Alert System</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
-        body { font-family: Arial, sans-serif; text-align: center; padding: 40px; background: #f4f4f9; }
+        body { font-family: Arial, sans-serif; text-align: center; padding: 30px; background: #f4f4f9; }
         h2 { color: #333; }
-        #status { font-size: 20px; font-weight: bold; margin: 20px 0; color: #d9534f; }
+        #status { font-size: 18px; font-weight: bold; margin: 15px 0; color: #333; }
+        #debug { font-size: 14px; color: #555; background: #fff; padding: 10px; border-radius: 5px; margin-top: 15px; border: 1px solid #ccc; }
         button { padding: 12px 24px; font-size: 16px; background: #0275d8; color: white; border: none; border-radius: 5px; cursor: pointer; }
     </style>
 </head>
@@ -16,19 +17,21 @@
     <div id="status">Status: Click 'Start' to begin</div>
     <button onclick="startSensor()">Start Monitoring</button>
 
+    <div id="debug">Sensor Debug: Not Started</div>
+
     <script>
         let lastMovementTime = Date.now();
-        const thresholdTime = 5000; // 5 seconds ka time limit
+        const thresholdTime = 5000; // 5 seconds
         let monitoring = false;
 
         function startSensor() {
-            // Permission request for modern mobile browsers
+            // Permission for mobile browsers
             if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
                 DeviceMotionEvent.requestPermission().then(response => {
                     if (response === 'granted') {
                         initListener();
                     } else {
-                        alert("Permission denied!");
+                        alert("Sensor permission denied!");
                     }
                 }).catch(console.error);
             } else {
@@ -39,21 +42,30 @@
         function initListener() {
             monitoring = true;
             lastMovementTime = Date.now();
-            document.getElementById("status").innerText = "Status: Monitoring active. Pet par phone rakhein.";
+            document.getElementById("statusinnerText" = "Status: Monitoring active. Pet par phone rakhein.");
             
             window.addEventListener('devicemotion', (event) => {
                 if (!monitoring) return;
-                let z = event.accelerationIncludingGravity.z;
                 
-                // Agar pet par saans lene se movement detect ho
-                if (z && Math.abs(z) > 0.8) {
+                let acc = event.accelerationIncludingGravity;
+                if (!acc) return;
+
+                let x = acc.x ? acc.x.toFixed(2) : 0;
+                let y = acc.y ? acc.y.toFixed(2) : 0;
+                let z = acc.z ? acc.z.toFixed(2) : 0;
+
+                // Screen par live values dikhane ke liye
+                document.getElementById("debug").innerHTML = `X: ${x} | Y: ${y} | Z: ${z}`;
+
+                // Agar kisi bhi axis par movement ho (motion sensitivity kam karke 0.2 kar di hai)
+                if (Math.abs(acc.z) > 0.3 || Math.abs(acc.y) > 0.3) {
                     lastMovementTime = Date.now();
                     document.getElementById("status").innerText = "Status: Breathing detected... Good!";
                     document.getElementById("status").style.color = "green";
                 }
             });
 
-            // Background timer check karne ke liye ki 5 second se saans choti toh nahi hui
+            // Timer check
             setInterval(() => {
                 if (!monitoring) return;
                 let currentTime = Date.now();
@@ -61,22 +73,26 @@
                     document.getElementById("status").innerText = "ALERT: Dhyan bhatak gaya! Saans par focus karein.";
                     document.getElementById("status").style.color = "red";
                     playBeep();
-                    lastMovementTime = currentTime; // Reset timer
+                    lastMovementTime = currentTime; 
                 }
             }, 1000);
         }
 
         function playBeep() {
-            let audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            let oscillator = audioCtx.createOscillator();
-            let gainNode = audioCtx.createGain();
-            oscillator.connect(gainNode);
-            gainNode.connect(audioCtx.destination);
-            oscillator.type = 'sine';
-            oscillator.frequency.value = 440; // Beep frequency
-            gainNode.gain.setValueAtTime(1, audioCtx.currentTime);
-            oscillator.start();
-            oscillator.stop(audioCtx.currentTime + 0.5); // 0.5 second ka beep sound
+            try {
+                let audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                let oscillator = audioCtx.createOscillator();
+                let gainNode = audioCtx.createGain();
+                oscillator.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                oscillator.type = 'sine';
+                oscillator.frequency.value = 440;
+                gainNode.gain.setValueAtTime(1, audioCtx.currentTime);
+                oscillator.start();
+                oscillator.stop(audioCtx.currentTime + 0.5);
+            } catch(e) {
+                console.log("Audio error: ", e);
+            }
         }
     </script>
 </body>
