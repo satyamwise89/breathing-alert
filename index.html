@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Breathing Compass Alert - 90% Strict Rule</title>
+    <title>Breathing Compass Alert - Strict 15-90 Range</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
         body { font-family: Arial, sans-serif; text-align: center; padding: 20px; background: #f4f4f9; }
@@ -34,7 +34,6 @@
             transition: transform 0.1s ease-out;
             z-index: 2;
         }
-        /* Compass ke andar tiny live number */
         .center-number {
             position: absolute;
             font-size: 14px;
@@ -71,7 +70,6 @@
         <div class="center-dot"></div>
     </div>
 
-    <!-- Neeche Current Value aur Details -->
     <div id="debug">Status: Waiting for start...</div>
 
     <script>
@@ -85,8 +83,8 @@
         let lowLimit15 = 0;
 
         let wanderCount = 0; 
-        let lastValidBreathTime = Date.now();
-        const thresholdTime = 6000; // 6 seconds limit
+        let wanderingStartTime = null; // Track karega ki 15% aur 90% ke beech mein kab se hai
+        const thresholdTime = 6000;   // 6 seconds limit
 
         function startSensor() {
             if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
@@ -130,13 +128,12 @@
                     let totalExpansion = targetBeta - baseBeta;
                     if (totalExpansion < 2) totalExpansion = 4; 
                     
-                    // 90% threshold aur 15% lower movement limit
                     threshold90 = baseBeta + (totalExpansion * 0.90);
                     lowLimit15 = baseBeta + (totalExpansion * 0.15);
 
                     isCalibrating = false;
                     monitoring = true;
-                    lastValidBreathTime = Date.now();
+                    wanderingStartTime = null;
 
                     if ("vibrate" in navigator) {
                         navigator.vibrate(300);
@@ -154,8 +151,6 @@
 
             let rotationAngle = beta * 2;
             document.getElementById("needle").style.transform = `rotate(${rotationAngle}deg)`;
-            
-            // Compass ke andar tiny live number show karein
             document.getElementById("centerNum").innerText = beta.toFixed(1);
 
             if (isCalibrating) {
@@ -168,41 +163,51 @@
 
             if (!monitoring) return;
 
-            // Neeche current value aur limits show karein
-            document.getElementById("debug").innerHTML = `Base: ${baseBeta.toFixed(1)} | 90% Limit: ${threshold90.toFixed(1)} | Current Value: <b>${beta.toFixed(1)}</b>`;
+            document.getElementById("debug").innerHTML = `Base: ${baseBeta.toFixed(1)} | 15% Low: ${lowLimit15.toFixed(1)} | 90% High: ${threshold90.toFixed(1)} | Current: <b>${beta.toFixed(1)}</b>`;
 
-            // Condition A: Achi gehri saans (>= 90% threshold) -> Good! Timer reset, No beep.
+            // STRICT CONDITION LOGIC:
+            // 1. Agar value >= 90% (Good Deep Breath) -> Wandering band, timer reset.
             if (beta >= threshold90) {
-                lastValidBreathTime = Date.now();
+                wanderingStartTime = null;
                 document.getElementById("status").innerText = "Status: Deep Breath Detected... Good!";
                 document.getElementById("status").style.color = "green";
             } 
-            // Condition B: Bilkul sthir ya stillness (< 15% expansion) -> Deep Meditation / Retention. Timer reset, No beep.
+            // 2. Agar value < 15% (Stillness / Breath Retention) -> Wandering band, timer reset. (15% se kam par ab KABHI beep nahi bajegi)
             else if (beta < lowLimit15) {
-                lastValidBreathTime = Date.now();
+                wanderingStartTime = null;
                 document.getElementById("status").innerText = "Status: Deep Stillness / Breath Retention...";
                 document.getElementById("status").style.color = "purple";
             } 
-            // Condition C: Sirf tabhi jab value 15% se upar ho aur 90% se kam ho (Shallow/Wandering Breathing) -> Timer chalne do, 6s baad beep bajegi!
+            // 3. Sirf tabhi jab value 15% se upar AUR 90% se kam ho (Shallow / Wandering Breathing zone)
             else {
-                document.getElementById("status").innerText = "Status: Shallow Breathing / Wandering...";
+                // Agar pehli baar is zone mein aaya hai, toh timer shuru karo
+                if (wanderingStartTime === null) {
+                    wanderingStartTime = Date.now();
+                }
+                document.getElementById("status").innerText = "Status: Shallow Breathing (In danger zone)...";
                 document.getElementById("status").style.color = "orange";
             }
         }
 
-        // Timer check alert & Score Increment
+        // Timer check alert & Score Increment (Strictly 15% - 90% zone mein 6 sec hone par)
         setInterval(() => {
             if (!monitoring) return;
-            let currentTime = Date.now();
-            if ((currentTime - lastValidBreathTime) > thresholdTime) {
-                wanderCount++; 
-                document.getElementById("wanderCount").innerText = wanderCount;
-                document.getElementById("status").innerText = "ALERT: Dhyan bhatak gaya! Saans par focus karein.";
-                document.getElementById("status").style.color = "red";
-                playBeep();
-                lastValidBreathTime = currentTime; 
+            
+            // Agar hum wandering zone mein hain aur 6 seconds pure ho gaye hain
+            if (wanderingStartTime !== null) {
+                let elapsedTime = Date.now() - wanderingStartTime;
+                if (elapsedTime >= thresholdTime) {
+                    wanderCount++; 
+                    document.getElementById("wanderCount").innerText = wanderCount;
+                    document.getElementById("status").innerText = "ALERT: Dhyan bhatak gaya! Saans par focus karein.";
+                    document.getElementById("status").style.color = "red";
+                    playBeep();
+                    
+                    // Timer reset kar do taaki lagataar beep na bajti rahe, naya 6s count shuru ho
+                    wanderingStartTime = Date.now(); 
+                }
             }
-        }, 1000);
+        }, 500);
 
         function playBeep() {
             try {
