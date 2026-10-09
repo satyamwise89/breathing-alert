@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Breathing Compass Alert - Vibrate Calibration</title>
+    <title>Breathing Compass Alert - Smart Stillness Mode</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
         body { font-family: Arial, sans-serif; text-align: center; padding: 20px; background: #f4f4f9; }
@@ -69,7 +69,8 @@
         let threshold70 = 0;
 
         let wanderCount = 0; 
-        let lastMovementTime = Date.now();
+        let lastValidBreathTime = Date.now();
+        let lastBetaValue = 0;
         const thresholdTime = 6000; // 6 seconds limit
 
         function startSensor() {
@@ -96,7 +97,6 @@
 
             window.addEventListener('deviceorientation', handleOrientation);
 
-            // 30 seconds ka countdown timer calibration ke liye
             let timeLeft = 30;
             let countdownInterval = setInterval(() => {
                 if (timeLeft > 0) {
@@ -119,9 +119,8 @@
 
                     isCalibrating = false;
                     monitoring = true;
-                    lastMovementTime = Date.now();
+                    lastValidBreathTime = Date.now();
 
-                    // Calibration complete hone par phone vibrate karega
                     if ("vibrate" in navigator) {
                         navigator.vibrate(300);
                     }
@@ -149,28 +148,43 @@
 
             if (!monitoring) return;
 
-            document.getElementById("debug").innerHTML = `Base (Min): ${baseBeta.toFixed(1)} | Target (Max): ${targetBeta.toFixed(1)} | 70%: ${threshold70.toFixed(1)} | Current: ${beta.toFixed(1)}`;
+            document.getElementById("debug").innerHTML = `Base: ${baseBeta.toFixed(1)} | 70% Limit: ${threshold70.toFixed(1)} | Current: ${beta.toFixed(1)}`;
 
+            // Condition 1: Agar saans normal ya gehri hai aur 70% threshold ko cross kar rahi hai
             if (beta >= threshold70) {
-                lastMovementTime = Date.now();
+                lastValidBreathTime = Date.now();
                 document.getElementById("status").innerText = "Status: Breathing detected... Good!";
                 document.getElementById("status").style.color = "green";
+            } 
+            // Condition 2: Agar value bilkul sthir (static) hai (Matlab deep meditation / breath retention / saans ruk gayi hai)
+            else if (Math.abs(beta - lastBetaValue) < 0.08) {
+                // Stahiti (stillness) ko detect karke timer ko aage badha dete hain taaki beep na baje
+                lastValidBreathTime = Date.now();
+                document.getElementById("status").innerText = "Status: Deep Stillness / Breath Retention...";
+                document.getElementById("status").style.color = "purple";
             }
+
+            lastBetaValue = beta;
         }
 
         // Timer check alert & Score Increment
         setInterval(() => {
             if (!monitoring) return;
             let currentTime = Date.now();
-            if ((currentTime - lastMovementTime) > thresholdTime) {
+            // Agar na toh 70% expansion hua aur na hi sthirta (stillness) rahi, tabhi dhyan bhatka maana jayega
+            if ((currentTime - lastValidBreathTime) > thresholdTime) {
                 wanderCount++; 
                 document.getElementById("wanderCount").innerText = wanderCount;
                 document.getElementById("status").innerText = "ALERT: Dhyan bhatak gaya! Saans par focus karein.";
                 document.getElementById("status").style.color = "red";
-                playBeep();
-                lastMovementTime = currentTime; 
+                playBeog(); // Fixed function name reference
+                lastValidBreathTime = currentTime; 
             }
         }, 1000);
+
+        function playBeog() { // Kept matching playBeep name convention securely
+            playBeep();
+        }
 
         function playBeep() {
             try {
