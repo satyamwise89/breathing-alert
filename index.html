@@ -121,7 +121,7 @@
                     monitoring = true;
                     lastMovementTime = Date.now();
 
-                    // Calibration complete hone par phone vibrate karega (jaise 300ms ke liye vibration)
+                    // Calibration complete hone par phone vibrate karega
                     if ("vibrate" in navigator) {
                         navigator.vibrate(300);
                     }
@@ -154,7 +154,7 @@
             if (beta >= threshold70) {
                 lastMovementTime = Date.now();
                 document.getElementById("status").innerText = "Status: Breathing detected... Good!";
-                document.getElementById("status::color"] = "green";
+                document.getElementById("status").style.color = "green";
             }
         }
 
