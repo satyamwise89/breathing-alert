@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Breathing Compass Alert - Frequency Rule</title>
+    <title>Breathing Compass Alert - Direct Timer Rule</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
         body { font-family: Arial, sans-serif; text-align: center; padding: 20px; background: #f4f4f9; }
@@ -83,9 +83,8 @@
         let lowLimit15 = 0;
 
         let wanderCount = 0; 
-        let shallowCount = 0; // 15% se niche jaakar upar aane ka count
-        let wasBelow15 = false; // Track karega ki value pehle 15% se niche gayi thi ya nahi
-        let lastZone = "none"; // "low", "middle", "high"
+        let wanderingStartTime = null; 
+        const thresholdTime = 6000; // 6 seconds limit
 
         function startSensor() {
             if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
@@ -106,8 +105,6 @@
             monitoring = false;
             calibrationValues = [];
             wanderCount = 0;
-            shallowCount = 0;
-            wasBelow15 = false;
             document.getElementById("wanderCount").innerText = wanderCount;
             document.getElementById("status").style.color = "#d9534f";
 
@@ -136,8 +133,7 @@
 
                     isCalibrating = false;
                     monitoring = true;
-                    wasBelow15 = false;
-                    shallowCount = 0;
+                    wanderingStartTime = null;
 
                     if ("vibrate" in navigator) {
                         navigator.vibrate(300);
@@ -167,49 +163,47 @@
 
             if (!monitoring) return;
 
-            document.getElementById("debug").innerHTML = `Base: ${baseBeta.toFixed(1)} | 15%: ${lowLimit15.toFixed(1)} | 90%: ${threshold90.toFixed(1)} | Shallow Count: <b>${shallowCount}</b>`;
+            document.getElementById("debug").innerHTML = `Base: ${baseBeta.toFixed(1)} | 15%: ${lowLimit15.toFixed(1)} | 90%: ${threshold90.toFixed(1)} | Current: <b>${beta.toFixed(1)}</b>`;
 
-            // ZONE LOGIC:
-            // 1. Low Zone (< 15%): Stillness / Breath Retention
-            if (beta < lowLimit15) {
-                wasBelow15 = true; // Mark kar liya ki value niche gayi thi
-                lastZone = "low";
-                document.getElementById("status").innerText = "Status: Deep Stillness / Retention (<15%)";
-                document.getElementById("status").style.color = "purple";
-            } 
-            // 2. High Zone (>= 90%): Deep Breath -> Good! Reset counts.
-            else if (beta >= threshold90) {
-                wasBelow15 = false;
-                shallowCount = 0; // Gehri saans lene par count reset ho jayega
-                lastZone = "high";
-                document.getElementById("status").innerText = "Status: Deep Breath Detected... Good! (>=90%)";
+            // 1. Agar value >= 90% (Good Deep Breath) -> Timer reset, No beep.
+            if (beta >= threshold90) {
+                wanderingStartTime = null;
+                document.getElementById("status").innerText = "Status: Deep Breath Detected... Good!";
                 document.getElementById("status").style.color = "green";
             } 
-            // 3. Middle Zone (15% se upar AUR 90% se kam): Danger / Shallow Zone
+            // 2. Agar value < 15% (Stillness / Breath Retention) -> Timer reset, No beep.
+            else if (beta < lowLimit15) {
+                wanderingStartTime = null;
+                document.getElementById("status").innerText = "Status: Deep Stillness / Breath Retention...";
+                document.getElementById("status").style.color = "purple";
+            } 
+            // 3. Danger Zone (15% se upar aur 90% se kam) -> Timer shuru hoga
             else {
-                // Agar value pehle <15% thi aur ab middle zone mein aayi hai, matlab ek shallow cycle poori hui
-                if (wasBelow15 && lastZone !== "middle") {
-                    shallowCount++; // Count 1 se badh gaya
-                    wasBelow15 = false; // Reset flag for next cycle
+                if (wanderingStartTime === null) {
+                    wanderingStartTime = Date.now();
                 }
-                lastZone = "middle";
+                document.getElementById("status").innerText = "Status: Shallow Breathing (Danger Zone)...";
+                document.getElementById("status").style.color = "orange";
+            }
+        }
 
-                // AGAR 2 SE ZYADA BAR SHALLOW BREATHING HO GAYI HAI
-                if (shallowCount > 2) {
-                    wanderCount++;
+        // Timer check alert & Score Increment
+        setInterval(() => {
+            if (!monitoring) return;
+            
+            if (wanderingStartTime !== null) {
+                let elapsedTime = Date.now() - wanderingStartTime;
+                if (elapsedTime >= thresholdTime) {
+                    wanderCount++; 
                     document.getElementById("wanderCount").innerText = wanderCount;
-                    document.getElementById("status").innerText = "ALERT: 2 baar se zyada shallow breathing! Dhyan de.";
+                    document.getElementById("status").innerText = "ALERT: Dhyan bhatak gaya! Saans par focus karein.";
                     document.getElementById("status").style.color = "red";
                     playBeep();
                     
-                    // Logic reset taaki agli baar fir se 2 baar hone par beep baje
-                    shallowCount = 0; 
-                } else {
-                    document.getElementById("status").innerText = `Status: Shallow Breathing (Count: ${shallowCount}/2)`;
-                    document.getElementById("status").style.color = "orange";
+                    wanderingStartTime = Date.now(); // Reset timer for next alert if they stay in zone
                 }
             }
-        }
+        }, 500);
 
         function playBeep() {
             try {
