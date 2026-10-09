@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Breathing Alert System</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; padding: 40px; background: #f4f4f9; }
+        h2 { color: #333; }
+        #status { font-size: 20px; font-weight: bold; margin: 20px 0; color: #d9534f; }
+        button { padding: 12px 24px; font-size: 16px; background: #0275d8; color: white; border: none; border-radius: 5px; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+    <h2>Breathing Focus Monitor</h2>
+    <div id="status">Status: Click 'Start' to begin</div>
+    <button onclick="startSensor()">Start Monitoring</button>
+
+    <script>
+        let lastMovementTime = Date.now();
+        const thresholdTime = 5000; // 5 seconds ka time limit
+        let monitoring = false;
+
+        function startSensor() {
+            // Permission request for modern mobile browsers
+            if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+                DeviceMotionEvent.requestPermission().then(response => {
+                    if (response === 'granted') {
+                        initListener();
+                    } else {
+                        alert("Permission denied!");
+                    }
+                }).catch(console.error);
+            } else {
+                initListener();
+            }
+        }
+
+        function initListener() {
+            monitoring = true;
+            lastMovementTime = Date.now();
+            document.getElementById("status").innerText = "Status: Monitoring active. Pet par phone rakhein.";
+            
+            window.addEventListener('devicemotion', (event) => {
+                if (!monitoring) return;
+                let z = event.accelerationIncludingGravity.z;
+                
+                // Agar pet par saans lene se movement detect ho
+                if (z && Math.abs(z) > 0.8) {
+                    lastMovementTime = Date.now();
+                    document.getElementById("status").innerText = "Status: Breathing detected... Good!";
+                    document.getElementById("status").style.color = "green";
+                }
+            });
+
+            // Background timer check karne ke liye ki 5 second se saans choti toh nahi hui
+            setInterval(() => {
+                if (!monitoring) return;
+                let currentTime = Date.now();
+                if ((currentTime - lastMovementTime) > thresholdTime) {
+                    document.getElementById("status").innerText = "ALERT: Dhyan bhatak gaya! Saans par focus karein.";
+                    document.getElementById("status").style.color = "red";
+                    playBeep();
+                    lastMovementTime = currentTime; // Reset timer
+                }
+            }, 1000);
+        }
+
+        function playBeep() {
+            let audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            let oscillator = audioCtx.createOscillator();
+            let gainNode = audioCtx.createGain();
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            oscillator.type = 'sine';
+            oscillator.frequency.value = 440; // Beep frequency
+            gainNode.gain.setValueAtTime(1, audioCtx.currentTime);
+            oscillator.start();
+            oscillator.stop(audioCtx.currentTime + 0.5); // 0.5 second ka beep sound
+        }
+    </script>
+</body>
+</html>
