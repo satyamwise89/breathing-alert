@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Breathing Compass Alert - Fixed Stability</title>
+    <title>Breathing Compass Alert - 90% Strict Rule</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
         body { font-family: Arial, sans-serif; text-align: center; padding: 20px; background: #f4f4f9; }
@@ -32,10 +32,23 @@
             border-radius: 3px;
             transform-origin: bottom center;
             transition: transform 0.1s ease-out;
+            z-index: 2;
+        }
+        /* Compass ke andar tiny live number */
+        .center-number {
+            position: absolute;
+            font-size: 14px;
+            font-weight: bold;
+            color: #333;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 4px 8px;
+            border-radius: 10px;
+            z-index: 3;
+            bottom: 50px;
         }
         .center-dot {
-            width: 16px;
-            height: 16px;
+            width: 12px;
+            height: 12px;
             background: #333;
             border-radius: 50%;
             z-index: 2;
@@ -54,9 +67,11 @@
 
     <div class="compass-container">
         <div class="needle" id="needle"></div>
+        <div class="center-number" id="centerNum">0.0</div>
         <div class="center-dot"></div>
     </div>
 
+    <!-- Neeche Current Value aur Details -->
     <div id="debug">Status: Waiting for start...</div>
 
     <script>
@@ -66,11 +81,11 @@
         
         let baseBeta = 0;
         let targetBeta = 0;
-        let threshold70 = 0;
+        let threshold90 = 0;
+        let lowLimit15 = 0;
 
         let wanderCount = 0; 
         let lastValidBreathTime = Date.now();
-        let lastBetaValue = 0;
         const thresholdTime = 6000; // 6 seconds limit
 
         function startSensor() {
@@ -115,7 +130,9 @@
                     let totalExpansion = targetBeta - baseBeta;
                     if (totalExpansion < 2) totalExpansion = 4; 
                     
-                    threshold70 = baseBeta + (totalExpansion * 0.70);
+                    // 90% threshold aur 15% lower movement limit
+                    threshold90 = baseBeta + (totalExpansion * 0.90);
+                    lowLimit15 = baseBeta + (totalExpansion * 0.15);
 
                     isCalibrating = false;
                     monitoring = true;
@@ -137,39 +154,40 @@
 
             let rotationAngle = beta * 2;
             document.getElementById("needle").style.transform = `rotate(${rotationAngle}deg)`;
+            
+            // Compass ke andar tiny live number show karein
+            document.getElementById("centerNum").innerText = beta.toFixed(1);
 
             if (isCalibrating) {
                 calibrationValues.push(beta);
                 let currentMin = Math.min(...calibrationValues);
                 let currentMax = Math.max(...calibrationValues);
-                document.getElementById("debug").innerHTML = `Calibrating (30s)... Min: ${currentMin.toFixed(1)} | Max: ${currentMax.toFixed(1)}`;
+                document.getElementById("debug").innerHTML = `Calibrating (30s)... Min: ${currentMin.toFixed(1)} | Max: ${currentMax.toFixed(1)} | Current: ${beta.toFixed(1)}`;
                 return;
             }
 
             if (!monitoring) return;
 
-            let deltaChange = Math.abs(beta - lastBetaValue);
-            document.getElementById("debug").innerHTML = `Base: ${baseBeta.toFixed(1)} | 70% Limit: ${threshold70.toFixed(1)} | Change: ${deltaChange.toFixed(1)}`;
+            // Neeche current value aur limits show karein
+            document.getElementById("debug").innerHTML = `Base: ${baseBeta.toFixed(1)} | 90% Limit: ${threshold90.toFixed(1)} | Current Value: <b>${beta.toFixed(1)}</b>`;
 
-            // 1. Good Breathing: Jab saans 70% threshold ko cross kare
-            if (beta >= threshold70) {
+            // Condition A: Achi gehri saans (>= 90% threshold) -> Good! Timer reset, No beep.
+            if (beta >= threshold90) {
                 lastValidBreathTime = Date.now();
-                document.getElementById("status").innerText = "Status: Breathing detected... Good!";
+                document.getElementById("status").innerText = "Status: Deep Breath Detected... Good!";
                 document.getElementById("status").style.color = "green";
             } 
-            // 2. Absolute Stillness / Breath Retention: Jab change 2.0 se kam ho (stable ho) -> Timer lagataar refresh hoga, beep NAHI bajegi
-            else if (deltaChange < 2.0) {
-                lastValidBreathTime = Date.now(); // Yahin par fix kiya hai taaki timer expire na ho
+            // Condition B: Bilkul sthir ya stillness (< 15% expansion) -> Deep Meditation / Retention. Timer reset, No beep.
+            else if (beta < lowLimit15) {
+                lastValidBreathTime = Date.now();
                 document.getElementById("status").innerText = "Status: Deep Stillness / Breath Retention...";
                 document.getElementById("status").style.color = "purple";
-            }
-            // 3. Shallow / Distracted Breathing: Change 2.0 se zyada hai par 70% threshold se kam hai -> Timer chalne do (Beep bajegi agar 6s hua)
+            } 
+            // Condition C: Sirf tabhi jab value 15% se upar ho aur 90% se kam ho (Shallow/Wandering Breathing) -> Timer chalne do, 6s baad beep bajegi!
             else {
                 document.getElementById("status").innerText = "Status: Shallow Breathing / Wandering...";
                 document.getElementById("status").style.color = "orange";
             }
-
-            lastBetaValue = beta;
         }
 
         // Timer check alert & Score Increment
