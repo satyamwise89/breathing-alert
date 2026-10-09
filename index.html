@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Breathing Compass Alert - Auto Calibrated</title>
+    <title>Breathing Compass Alert - 3 Sec Calibrated</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
         body { font-family: Arial, sans-serif; text-align: center; padding: 20px; background: #f4f4f9; }
@@ -59,11 +59,16 @@
 
     <script>
         let monitoring = false;
-        let isCalibrating = false;
-        let baseBeta = 0;             
-        let calibrationReadings = [];
+        let calibrationStep = 0; // 1: Base recording (3 sec), 2: Deep breath recording (3 sec)
+        let baseValues = [];
+        let targetValues = [];
+        
+        let baseBeta = 0;
+        let targetBeta = 0;
+        let threshold70 = 0;
+
         let lastMovementTime = Date.now();
-        const thresholdTime = 6000;   
+        const thresholdTime = 6000; // 6 seconds limit
 
         function startSensor() {
             if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
@@ -80,10 +85,11 @@
         }
 
         function beginCalibration() {
-            isCalibrating = true;
+            calibrationStep = 1;
             monitoring = false;
-            calibrationReadings = [];
-            document.getElementById("status").innerText = "Calibrating... Relax and breathe normally (3 sec)";
+            baseValues = [];
+            targetValues = [];
+            document.getElementById("status").innerText = "Step 1: Normal saans lein (3 seconds)...";
             document.getElementById("status").style.color = "#d9534f";
 
             window.addEventListener('deviceorientation', handleOrientation);
@@ -96,17 +102,37 @@
             let rotationAngle = beta * 2;
             document.getElementById("needle").style.transform = `rotate(${rotationAngle}deg)`;
 
-            if (isCalibrating) {
-                calibrationReadings.push(beta);
-                document.getElementById("debug").innerHTML = `Calibrating... Current Beta: ${beta.toFixed(2)}`;
+            // Step 1: Record Normal/Base State (Poore 3 seconds / ~30 readings)
+            if (calibrationStep === 1) {
+                baseValues.push(beta);
+                document.getElementById("debug").innerHTML = `Calibrating Base (3s)... Current: ${beta.toFixed(1)}`;
                 
-                if (calibrationReadings.length === 30) { 
-                    let sum = calibrationReadings.reduce((a, b) => a + b, 0);
-                    baseBeta = sum / calibrationReadings.length;
-                    isCalibrating = false;
+                if (baseValues.length === 30) {
+                    baseBeta = baseValues.reduce((a, b) => a + b, 0) / baseValues.length;
+                    calibrationStep = 2; // Move to Step 2
+                    document.getElementById("status").innerText = "Step 2: Ab lambi/gehri saans lein (3 seconds)...";
+                }
+                return;
+            }
+
+            // Step 2: Record Target/Max Expansion State (Poore 3 seconds / ~30 readings)
+            if (calibrationStep === 2) {
+                targetValues.push(beta);
+                document.getElementById("debug").innerHTML = `Calibrating Target (3s)... Current: ${beta.toFixed(1)}`;
+                
+                if (targetValues.length === 30) {
+                    let maxTarget = Math.max(...targetValues); 
+                    targetBeta = maxTarget;
+
+                    let totalExpansion = targetBeta - baseBeta;
+                    if (totalExpansion < 2) totalExpansion = 4; 
+                    
+                    threshold70 = baseBeta + (totalExpansion * 0.70);
+
+                    calibrationStep = 0; 
                     monitoring = true;
                     lastMovementTime = Date.now();
-                    
+
                     document.getElementById("status").innerText = "Status: Calibration Done! Monitoring active.";
                     document.getElementById("status").style.color = "green";
                 }
@@ -115,12 +141,9 @@
 
             if (!monitoring) return;
 
-            let currentExpansion = beta - baseBeta; 
-            let requiredExpansion = 4.0;            
+            document.getElementById("debug").innerHTML = `Base: ${baseBeta.toFixed(1)} | Target 70%: ${threshold70.toFixed(1)} | Current Beta: ${beta.toFixed(1)}`;
 
-            document.getElementById("debug").innerHTML = `Base: ${baseBeta.toFixed(1)} | Beta: ${beta.toFixed(1)} | Diff: ${currentExpansion.toFixed(1)}`;
-
-            if (currentExpansion >= requiredExpansion) {
+            if (beta >= threshold70) {
                 lastMovementTime = Date.now();
                 document.getElementById("status").innerText = "Status: Breathing detected... Good!";
                 document.getElementById("status").style.color = "green";
