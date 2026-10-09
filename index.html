@@ -1,14 +1,13 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Breathing Compass Alert</title>
+    <title>Breathing Compass Alert - Auto Calibrated</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
         body { font-family: Arial, sans-serif; text-align: center; padding: 20px; background: #f4f4f9; }
         h2 { color: #333; }
         #status { font-size: 18px; font-weight: bold; margin: 15px 0; color: #333; }
         
-        /* Compass / Needle UI */
         .compass-container {
             position: relative;
             width: 200px;
@@ -48,79 +47,103 @@
 <body>
 
     <h2>Breathing Focus Compass</h2>
-    <div id="status">Status: Click 'Start' to begin</div>
+    <div id="status">Status: Click 'Start' to begin calibration</div>
     <button onclick="startSensor()">Start Monitoring</button>
 
-    <!-- Animated Compass Needle -->
     <div class="compass-container">
         <div class="needle" id="needle"></div>
         <div class="center-dot"></div>
     </div>
 
-    <div id="debug">Compass Debug: Waiting for orientation...</div>
+    <div id="debug">Status: Waiting for start...</div>
 
     <script>
-        let lastMovementTime = Date.now();
-        const thresholdTime = 6000; // 6 seconds ka gap
         let monitoring = false;
-        let lastBeta = 0;
+        let isCalibrating = false;
+        let baseBeta = 0;             // Normal state value (e.g., 10-11)
+        let calibrationReadings = [];
+        let lastMovementTime = Date.now();
+        const thresholdTime = 6000;   // 6 seconds ka gap limit
+        let hasExpanded = false;
 
         function startSensor() {
-            // iOS aur modern Android ke liye permission check
             if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
                 DeviceOrientationEvent.requestPermission().then(response => {
                     if (response === 'granted') {
-                        initListener();
+                        beginCalibration();
                     } else {
                         alert("Permission denied!");
                     }
                 }).catch(console.error);
             } else {
-                initListener();
+                beginCalibration();
             }
         }
 
-        function initListener() {
-            monitoring = true;
-            lastMovementTime = Date.now();
-            document.getElementById("status").innerText = "Status: Monitoring active. Pet par phone rakhein.";
-            
-            // DeviceOrientation API ka use compass/tilt ke liye
-            window.addEventListener('deviceorientation', (event) => {
-                if (!monitoring) return;
+        function beginCalibration() {
+            isCalibrating = true;
+            monitoring = false;
+            calibrationReadings = [];
+            document.getElementById("status").innerText = "Calibrating... Relax and breathe normally (3 sec)";
+            document.getElementById("status").style.color = "#d9534f";
 
-                let alpha = event.alpha ? event.alpha : 0; // Direction
-                let beta = event.beta ? event.beta : 0;     // Front/Back tilt (Pet ke utaar-chadhaw ke liye best)
-                let gamma = event.gamma ? event.gamma : 0;   // Left/Right tilt
+            // Listeners on karo calibration ke liye data collect karne ko
+            window.addEventListener('deviceorientation', handleOrientation);
+        }
 
-                // Screen par needle ko rotate karne ke liye beta ka use karenge
-                let rotationAngle = beta * 2; 
-                document.getElementById("needle").style.transform = `rotate(${rotationAngle}deg)`;
+        function handleOrientation(event) {
+            let beta = event.beta ? event.beta : 0;
+            let gamma = event.gamma ? event.gamma : 0;
 
-                document.getElementById("debug").innerHTML = `Beta (Tilt): ${beta.toFixed(2)} | Gamma: ${gamma.toFixed(2)}`;
+            // Needle rotation
+            let rotationAngle = beta * 2;
+            document.getElementById("needle").style.transform = `rotate(${rotationAngle}deg)`;
 
-                // Saans lene par jab halka sa bhi tilt change hoga, timer reset ho jayega
-                let difference = Math.abs(beta - lastBeta);
-                if (difference > 0.2) { 
+            if (isCalibrating) {
+                calibrationReadings.push(beta);
+                document.getElementById("debug").innerHTML = `Calibrating... Current Beta: ${beta.toFixed(2)}`;
+                
+                // 3 second tak readings collect karke average base value nikal lenge
+                if (calibrationReadings.length === 30) { // ~3 seconds at standard event rate
+                    let sum = calibrationReadings.reduce((a, b) => a + b, 0);
+                    baseBeta = sum / calibrationReadings.length;
+                    isCalibrating = false;
+                    monitoring = true;
                     lastMovementTime = Date.now();
-                    document.getElementById("status").innerText = "Status: Breathing detected... Good!";
+                    
+                    document.getElementById("status").innerText = "Status: Calibration Done! Monitoring active.";
                     document.getElementById("status").style.color = "green";
                 }
-                lastBeta = beta;
-            });
+                return;
+            }
 
-            // Timer check alert ke liye (6 second tak saans na aane par beep)
-            setInterval(() => {
-                if (!monitoring) return;
-                let currentTime = Date.now();
-                if ((currentTime - lastMovementTime) > thresholdTime) {
-                    document.getElementById("status").innerText = "ALERT: Dhyan bhatak gaya! Saans par focus karein.";
-                    document.getElementById("status").style.color = "red";
-                    playBeep();
-                    lastMovementTime = currentTime; // Reset timer taaki lagataar beep na baje
-                }
-            }, 1000);
+            if (!monitoring) return;
+
+            // Target Expansion calculate karo (Aapke mutabik 10-11 se badhkar 20-21 yaani ~10 point ka difference aata hai)
+            let currentExpansion = beta - baseBeta; // Kitna pet phula base se
+            let requiredExpansion = 4.0;            // 70% expansion ki limit (approx 4-5 unit jump)
+
+            document.getElementById("debug.innerHTML = `Base: ${baseBeta.toFixed(1)} | Beta: ${beta.toFixed(1)} | Diff: ${currentExpansion.toFixed(1)}`;
+
+            // Agar saans lene par expansion limit (70% ya usse upar) cross hota hai
+            if (currentExpansion >= requiredExpansion) {
+                lastMovementTime = Date.now();
+                document.getElementById("status").innerText = "Status: Breathing detected... Good!";
+                document.getElementById("status").style.color = "green";
+            }
         }
+
+        // Timer check alert ke liye (6 second tak agar pet nahi phula toh beep)
+        setInterval(() => {
+            if (!monitoring) return;
+            let currentTime = Date.now();
+            if ((currentTime - lastMovementTime) > thresholdTime) {
+                document.getElementById("status").innerText = "ALERT: Dhyan bhatak gaya! Saans par focus karein.";
+                document.getElementById("status").style.color = "red";
+                playBeep();
+                lastMovementTime = currentTime; // Reset timer
+            }
+        }, 1000);
 
         function playBeep() {
             try {
