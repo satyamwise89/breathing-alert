@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Breathing Compass Alert - Perfect Stillness Mode</title>
+    <title>Breathing Compass Alert - Strict Stillness Mode</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
         body { font-family: Arial, sans-serif; text-align: center; padding: 20px; background: #f4f4f9; }
@@ -150,14 +150,14 @@
 
             document.getElementById("debug").innerHTML = `Base: ${baseBeta.toFixed(1)} | 70% Limit: ${threshold70.toFixed(1)} | Current: ${beta.toFixed(1)}`;
 
-            // Condition 1: Agar saans normal ya gehri hai aur 70% threshold ko cross kar rahi hai
+            // Condition 1: Agar saans 70% threshold ko cross kar rahi hai
             if (beta >= threshold70) {
                 lastValidBreathTime = Date.now();
                 document.getElementById("status").innerText = "Status: Breathing detected... Good!";
                 document.getElementById("status").style.color = "green";
             } 
-            // Condition 2: Agar phone sthir hai (Deep Meditation / Breath Retention) - Limit badhakar 0.6 kar di hai
-            else if (Math.abs(beta - lastBetaValue) < 0.6) {
+            // Condition 2: Deep Meditation / Stillness (Limit badhakar ab 2 kar di gayi hai)
+            else if (Math.abs(beta - lastBetaValue) < 2.0) {
                 lastValidBreathTime = Date.now();
                 document.getElementById("status").innerText = "Status: Deep Stillness / Breath Retention...";
                 document.getElementById("status").style.color = "purple";
