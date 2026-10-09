@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Breathing Compass Alert - Strict Stillness Mode</title>
+    <title>Breathing Compass Alert - Final Logic</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
         body { font-family: Arial, sans-serif; text-align: center; padding: 20px; background: #f4f4f9; }
@@ -142,25 +142,31 @@
                 calibrationValues.push(beta);
                 let currentMin = Math.min(...calibrationValues);
                 let currentMax = Math.max(...calibrationValues);
-                document.getElementById("debug").innerHTML = `Calibrating (30s)... Min (Base): ${currentMin.toFixed(1)} | Max (Target): ${currentMax.toFixed(1)}`;
+                document.getElementById("debug").innerHTML = `Calibrating (30s)... Min: ${currentMin.toFixed(1)} | Max: ${currentMax.toFixed(1)}`;
                 return;
             }
 
             if (!monitoring) return;
 
-            document.getElementById("debug").innerHTML = `Base: ${baseBeta.toFixed(1)} | 70% Limit: ${threshold70.toFixed(1)} | Current: ${beta.toFixed(1)}`;
+            let deltaChange = Math.abs(beta - lastBetaValue);
+            document.getElementById("debug").innerHTML = `Base: ${baseBeta.toFixed(1)} | 70% Limit: ${threshold70.toFixed(1)} | Change: ${deltaChange.toFixed(1)}`;
 
-            // Condition 1: Agar saans 70% threshold ko cross kar rahi hai
+            // 1. Good Breathing: Jab saans 70% threshold ko cross kare
             if (beta >= threshold70) {
                 lastValidBreathTime = Date.now();
                 document.getElementById("status").innerText = "Status: Breathing detected... Good!";
                 document.getElementById("status").style.color = "green";
             } 
-            // Condition 2: Deep Meditation / Stillness (Limit badhakar ab 2 kar di gayi hai)
-            else if (Math.abs(beta - lastBetaValue) < 2.0) {
-                lastValidBreathTime = Date.now();
+            // 2. Absolute Stillness / Breath Retention: Jab phone bilkul stable ho (change < 2.0) -> Beep NAHI bajni chahiye
+            else if (deltaChange < 2.0) {
+                lastValidBreathTime = Date.now(); // Timer reset rakho taaki beep na baje
                 document.getElementById("status").innerText = "Status: Deep Stillness / Breath Retention...";
                 document.getElementById("status").style.color = "purple";
+            }
+            // 3. Shallow / Distracted Breathing: Change 2.0 se zyada hai par 70% threshold se kam hai -> Timer chalne do (Beep bajegi agar 6s hua)
+            else {
+                document.getElementById("status").innerText = "Status: Shallow Breathing / Wandering...";
+                document.getElementById("status").style.color = "orange";
             }
 
             lastBetaValue = beta;
