@@ -8,7 +8,6 @@
         h2 { color: #333; }
         #status { font-size: 18px; font-weight: bold; margin: 15px 0; color: #333; }
         
-        /* Compass / Needle UI */
         .compass-container {
             position: relative;
             width: 200px;
@@ -51,21 +50,20 @@
     <div id="status">Status: Click 'Start' to begin</div>
     <button onclick="startSensor()">Start Monitoring</button>
 
-    <!-- Animated Compass Needle -->
     <div class="compass-container">
         <div class="needle" id="needle"></div>
         <div class="center-dot"></div>
     </div>
 
-    <div id="debug">Compass Debug: Waiting for orientation...</div>
+    <div id="debug">Compass Debug: Waiting...</div>
 
     <script>
         let lastMovementTime = Date.now();
-        const thresholdTime = 5000; // 5 seconds
+        const thresholdTime = 6000; // 6 seconds ka gap
         let monitoring = false;
+        let lastBeta = 0;
 
         function startSensor() {
-            // iOS aur modern Android ke liye permission check
             if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
                 DeviceOrientationEvent.requestPermission().then(response => {
                     if (response === 'granted') {
@@ -84,29 +82,28 @@
             lastMovementTime = Date.now();
             document.getElementById("status").innerText = "Status: Monitoring active. Pet par phone rakhein.";
             
-            // DeviceOrientation API ka use compass/tilt ke liye
             window.addEventListener('deviceorientation', (event) => {
                 if (!monitoring) return;
 
-                let alpha = event.alpha ? event.alpha : 0; // Direction
-                let beta = event.beta ? event.beta : 0;     // Front/Back tilt (Pet ke utaar-chadhaw ke liye best)
-                let gamma = event.gamma ? event.gamma : 0;   // Left/Right tilt
+                let beta = event.beta ? event.beta : 0; 
+                let gamma = event.gamma ? event.gamma : 0;   
 
-                // Screen par needle ko rotate karne ke liye beta ya alpha ka use karenge
                 let rotationAngle = beta * 2; 
                 document.getElementById("needle").style.transform = `rotate(${rotationAngle}deg)`;
 
-                document.getElementById("debug").innerHTML = `Beta (Tilt): ${beta.toFixed(2)} | Gamma: ${gamma.toFixed(2)}`;
+                document.getElementById("debug.innerHTML = `Beta: ${beta.toFixed(2)} | Diff: ${Math.abs(beta - lastBeta).toFixed(2)}`;
 
-                // Agar pet par saans lene se tilt change ho
-                if (Math.abs(beta) > 0.5 || Math.abs(gamma) > 0.5) {
+                // Yahan hum check kar rahe hain ki pichli value se thoda bhi badlav (movement) hua ya nahi
+                let difference = Math.abs(beta - lastBeta);
+                if (difference > 0.15) { // Pet ke utaar-chadhaw par yeh change detect hoga
                     lastMovementTime = Date.now();
                     document.getElementById("status").innerText = "Status: Breathing detected... Good!";
                     document.getElementById("status").style.color = "green";
                 }
+                lastBeta = beta;
             });
 
-            // Timer check alert ke liye
+            // Har 1 second mein check karega ki 6 second se zyada time toh nahi ho gaya bina saans ke
             setInterval(() => {
                 if (!monitoring) return;
                 let currentTime = Date.now();
@@ -114,7 +111,7 @@
                     document.getElementById("status").innerText = "ALERT: Dhyan bhatak gaya! Saans par focus karein.";
                     document.getElementById("status").style.color = "red";
                     playBeep();
-                    lastMovementTime = currentTime; 
+                    lastMovementTime = currentTime; // Reset timer taaki lagataar beep na baje
                 }
             }, 1000);
         }
