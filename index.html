@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Breathing Compass Alert - Max Target Calibrated</title>
+    <title>Breathing Compass Alert - Perfect Max Target</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
         body { font-family: Arial, sans-serif; text-align: center; padding: 20px; background: #f4f4f9; }
@@ -120,14 +120,14 @@
                 return;
             }
 
-            // Step 2: Target State - Poore 4 seconds me se MAXIMUM value lega
+            // Step 2: Target State - Poore 4 seconds tak values collect karo, fir max nikalo
             if (calibrationStep === 2) {
                 targetValues.push(beta);
-                let currentMax = Math.max(...targetValues);
-                document.getElementById("debug").innerHTML = `Calibrating Target (4s)... Max so far: ${currentMax.toFixed(1)}`;
+                document.getElementById("debug").innerHTML = `Calibrating Target (4s)... Readings collected: ${targetValues.length}/40`;
                 
                 if (targetValues.length === 40) {
-                    targetBeta = Math.max(...targetValues); // 4 second ka absolute maximum point
+                    // Poore 4 seconds ki saari values me se absolute maximum value yahan niklegi
+                    targetBeta = Math.max(...targetValues); 
 
                     let totalExpansion = targetBeta - baseBeta;
                     if (totalExpansion < 2) totalExpansion = 4; 
@@ -146,7 +146,7 @@
 
             if (!monitoring) return;
 
-            document.getElementById("debug").innerHTML = `Base: ${baseBeta.toFixed(1)} | Target 70%: ${threshold70.toFixed(1)} | Current Beta: ${beta.toFixed(1)}`;
+            document.getElementById("debug").innerHTML = `Base: ${baseBeta.toFixed(1)} | Target Max: ${targetBeta.toFixed(1)} | 70%: ${threshold70.toFixed(1)} | Current: ${beta.toFixed(1)}`;
 
             if (beta >= threshold70) {
                 lastMovementTime = Date.now();
