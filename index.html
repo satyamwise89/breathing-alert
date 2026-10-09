@@ -1,23 +1,63 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Breathing Alert System</title>
+    <title>Breathing Compass Alert</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
-        body { font-family: Arial, sans-serif; text-align: center; padding: 30px; background: #f4f4f9; }
+        body { font-family: Arial, sans-serif; text-align: center; padding: 20px; background: #f4f4f9; }
         h2 { color: #333; }
         #status { font-size: 18px; font-weight: bold; margin: 15px 0; color: #333; }
+        
+        /* Compass / Needle UI */
+        .compass-container {
+            position: relative;
+            width: 200px;
+            height: 200px;
+            margin: 30px auto;
+            background: #fff;
+            border: 5px solid #0275d8;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+        .needle {
+            position: absolute;
+            width: 6px;
+            height: 90px;
+            background: #d9534f;
+            top: 10px;
+            left: calc(50% - 3px);
+            border-radius: 3px;
+            transform-origin: bottom center;
+            transition: transform 0.1s ease-out;
+        }
+        .center-dot {
+            width: 16px;
+            height: 16px;
+            background: #333;
+            border-radius: 50%;
+            z-index: 2;
+        }
+
         #debug { font-size: 14px; color: #555; background: #fff; padding: 10px; border-radius: 5px; margin-top: 15px; border: 1px solid #ccc; }
         button { padding: 12px 24px; font-size: 16px; background: #0275d8; color: white; border: none; border-radius: 5px; cursor: pointer; }
     </style>
 </head>
 <body>
 
-    <h2>Breathing Focus Monitor</h2>
+    <h2>Breathing Focus Compass</h2>
     <div id="status">Status: Click 'Start' to begin</div>
     <button onclick="startSensor()">Start Monitoring</button>
 
-    <div id="debug">Sensor Debug: Not Started</div>
+    <!-- Animated Compass Needle -->
+    <div class="compass-container">
+        <div class="needle" id="needle"></div>
+        <div class="center-dot"></div>
+    </div>
+
+    <div id="debug">Compass Debug: Waiting for orientation...</div>
 
     <script>
         let lastMovementTime = Date.now();
@@ -25,13 +65,13 @@
         let monitoring = false;
 
         function startSensor() {
-            // Permission for mobile browsers
-            if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
-                DeviceMotionEvent.requestPermission().then(response => {
+            // iOS aur modern Android ke liye permission check
+            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                DeviceOrientationEvent.requestPermission().then(response => {
                     if (response === 'granted') {
                         initListener();
                     } else {
-                        alert("Sensor permission denied!");
+                        alert("Permission denied!");
                     }
                 }).catch(console.error);
             } else {
@@ -42,30 +82,31 @@
         function initListener() {
             monitoring = true;
             lastMovementTime = Date.now();
-            document.getElementById("statusinnerText" = "Status: Monitoring active. Pet par phone rakhein.");
+            document.getElementById("status").innerText = "Status: Monitoring active. Pet par phone rakhein.";
             
-            window.addEventListener('devicemotion', (event) => {
+            // DeviceOrientation API ka use compass/tilt ke liye
+            window.addEventListener('deviceorientation', (event) => {
                 if (!monitoring) return;
-                
-                let acc = event.accelerationIncludingGravity;
-                if (!acc) return;
 
-                let x = acc.x ? acc.x.toFixed(2) : 0;
-                let y = acc.y ? acc.y.toFixed(2) : 0;
-                let z = acc.z ? acc.z.toFixed(2) : 0;
+                let alpha = event.alpha ? event.alpha : 0; // Direction
+                let beta = event.beta ? event.beta : 0;     // Front/Back tilt (Pet ke utaar-chadhaw ke liye best)
+                let gamma = event.gamma ? event.gamma : 0;   // Left/Right tilt
 
-                // Screen par live values dikhane ke liye
-                document.getElementById("debug").innerHTML = `X: ${x} | Y: ${y} | Z: ${z}`;
+                // Screen par needle ko rotate karne ke liye beta ya alpha ka use karenge
+                let rotationAngle = beta * 2; 
+                document.getElementById("needle").style.transform = `rotate(${rotationAngle}deg)`;
 
-                // Agar kisi bhi axis par movement ho (motion sensitivity kam karke 0.2 kar di hai)
-                if (Math.abs(acc.z) > 0.3 || Math.abs(acc.y) > 0.3) {
+                document.getElementById("debug").innerHTML = `Beta (Tilt): ${beta.toFixed(2)} | Gamma: ${gamma.toFixed(2)}`;
+
+                // Agar pet par saans lene se tilt change ho
+                if (Math.abs(beta) > 0.5 || Math.abs(gamma) > 0.5) {
                     lastMovementTime = Date.now();
                     document.getElementById("status").innerText = "Status: Breathing detected... Good!";
                     document.getElementById("status").style.color = "green";
                 }
             });
 
-            // Timer check
+            // Timer check alert ke liye
             setInterval(() => {
                 if (!monitoring) return;
                 let currentTime = Date.now();
