@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Breathing Compass Alert - Scored & Calibrated</title>
+    <title>Breathing Compass Alert - Max Target Calibrated</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
         body { font-family: Arial, sans-serif; text-align: center; padding: 20px; background: #f4f4f9; }
@@ -69,7 +69,7 @@
         let targetBeta = 0;
         let threshold70 = 0;
 
-        let wanderCount = 0; // Score tracker
+        let wanderCount = 0; 
         let lastMovementTime = Date.now();
         const thresholdTime = 6000; // 6 seconds limit
 
@@ -115,19 +115,19 @@
                 if (baseValues.length === 40) {
                     baseBeta = baseValues.reduce((a, b) => a + b, 0) / baseValues.length;
                     calibrationStep = 2; 
-                    document.getElementById("status").innerText = "Step 2: Ab lambi/gehri saans lein (Poore 4 seconds)...";
+                    document.getElementById("status").innerText = "Step 2: Ab lambi/gehri saans lein (Poore 4 seconds max lo)...";
                 }
                 return;
             }
 
-            // Step 2: Target/Max Expansion State (4 seconds / ~40 readings)
+            // Step 2: Target State - Poore 4 seconds me se MAXIMUM value lega
             if (calibrationStep === 2) {
                 targetValues.push(beta);
-                document.getElementById("debug").innerHTML = `Calibrating Target (4s)... Current: ${beta.toFixed(1)}`;
+                let currentMax = Math.max(...targetValues);
+                document.getElementById("debug").innerHTML = `Calibrating Target (4s)... Max so far: ${currentMax.toFixed(1)}`;
                 
                 if (targetValues.length === 40) {
-                    let maxTarget = Math.max(...targetValues); 
-                    targetBeta = maxTarget;
+                    targetBeta = Math.max(...targetValues); // 4 second ka absolute maximum point
 
                     let totalExpansion = targetBeta - baseBeta;
                     if (totalExpansion < 2) totalExpansion = 4; 
@@ -160,7 +160,7 @@
             if (!monitoring) return;
             let currentTime = Date.now();
             if ((currentTime - lastMovementTime) > thresholdTime) {
-                wanderCount++; // Score badhega jab dhyan bhatkega
+                wanderCount++; 
                 document.getElementById("wanderCount").innerText = wanderCount;
                 document.getElementById("status").innerText = "ALERT: Dhyan bhatak gaya! Saans par focus karein.";
                 document.getElementById("status").style.color = "red";
