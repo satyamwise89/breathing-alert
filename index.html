@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Breathing Compass Alert - Strict 2-Count Frequency Rule</title>
+    <title>Breathing Compass Alert - Smart Reset Rule</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
         body { font-family: Arial, sans-serif; text-align: center; padding: 20px; background: #f4f4f9; }
@@ -176,10 +176,10 @@
                 document.getElementById("status").innerText = "Status: Deep Stillness / Retention (<15%)";
                 document.getElementById("status").style.color = "purple";
             } 
-            // 2. High Zone (>= 90%): Deep Breath -> Good! Reset counts.
+            // 2. High Zone (>= 90%): Deep Breath -> Good! Yahan count turant 0 ho jayega (Smart Reset)
             else if (beta >= threshold90) {
                 wasBelow15 = false;
-                shallowCount = 0; // Gehri saans lene par count reset ho jayega
+                shallowCount = 0; // Agar beech mein acchi saans aa gayi, toh count reset ho kar 0 ho jayega
                 lastZone = "high";
                 document.getElementById("status").innerText = "Status: Deep Breath Detected... Good! (>=90%)";
                 document.getElementById("status").style.color = "green";
@@ -193,7 +193,7 @@
                 }
                 lastZone = "middle";
 
-                // AGAR 2 SE ZYADA BAR SHALLOW BREATHING HO GAYI HAI (Yani 3 ya usse zyada baar)
+                // AGAR 2 SE ZYADA BAR LAGATAAR SHALLOW BREATHING HO GAYI HAI
                 if (shallowCount > 2) {
                     wanderCount++;
                     document.getElementById("wanderCount").innerText = wanderCount;
