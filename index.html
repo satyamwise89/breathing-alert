@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Breathing Compass Alert - Timed 4s Target</title>
+    <title>Breathing Compass Alert - Vibrate Calibration</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
         body { font-family: Arial, sans-serif; text-align: center; padding: 20px; background: #f4f4f9; }
@@ -49,7 +49,7 @@
 
     <h2>Breathing Focus Compass</h2>
     <div id="score-box">Mind Wandered Count: <span id="wanderCount">0</span> baar</div>
-    <div id="status">Status: Click 'Start' to begin calibration</div>
+    <div id="status">Status: Click 'Start' to begin</div>
     <button onclick="startSensor()">Start Monitoring</button>
 
     <div class="compass-container">
@@ -61,9 +61,8 @@
 
     <script>
         let monitoring = false;
-        let calibrationStep = 0; // 0: Idle, 1: Base (4s), 2: Target (4s)
-        let baseValues = [];
-        let targetValues = [];
+        let isCalibrating = false;
+        let calibrationValues = [];
         
         let baseBeta = 0;
         let targetBeta = 0;
@@ -88,50 +87,49 @@
         }
 
         function beginCalibration() {
-            calibrationStep = 1;
+            isCalibrating = true;
             monitoring = false;
-            baseValues = [];
-            targetValues = [];
+            calibrationValues = [];
             wanderCount = 0;
             document.getElementById("wanderCount").innerText = wanderCount;
-            document.getElementById("status").innerText = "Step 1: Normal saans lein (Poore 4 seconds)...";
             document.getElementById("status").style.color = "#d9534f";
 
             window.addEventListener('deviceorientation', handleOrientation);
 
-            // 4 seconds pure hone ke baad Step 1 complete hoga
-            setTimeout(() => {
-                if (calibrationStep === 1) {
-                    if (baseValues.length > 0) {
-                        baseBeta = baseValues.reduce((a, b) => a + b, 0) / baseValues.length;
+            // 30 seconds ka countdown timer calibration ke liye
+            let timeLeft = 30;
+            let countdownInterval = setInterval(() => {
+                if (timeLeft > 0) {
+                    document.getElementById("status").innerText = `Calibrating... Normal aur gehri saans lete rahein (${timeLeft}s remaining)`;
+                    timeLeft--;
+                } else {
+                    clearInterval(countdownInterval);
+                    if (calibrationValues.length > 0) {
+                        baseBeta = Math.min(...calibrationValues);
+                        targetBeta = Math.max(...calibrationValues);
+                    } else {
+                        baseBeta = 10;
+                        targetBeta = 20;
                     }
-                    calibrationStep = 2;
-                    document.getElementById("status").innerText = "Step 2: Ab lambi/gehri saans lein (Poore 4 seconds max lo)...";
+
+                    let totalExpansion = targetBeta - baseBeta;
+                    if (totalExpansion < 2) totalExpansion = 4; 
                     
-                    // Step 2 ke liye bhi strict 4 seconds ka timer
-                    setTimeout(() => {
-                        if (calibrationStep === 2) {
-                            if (targetValues.length > 0) {
-                                targetBeta = Math.max(...targetValues); // Poore 4s ki max value
-                            } else {
-                                targetBeta = baseBeta + 4; // Fallback
-                            }
+                    threshold70 = baseBeta + (totalExpansion * 0.70);
 
-                            let totalExpansion = targetBeta - baseBeta;
-                            if (totalExpansion < 2) totalExpansion = 4; 
-                            
-                            threshold70 = baseBeta + (totalExpansion * 0.70);
+                    isCalibrating = false;
+                    monitoring = true;
+                    lastMovementTime = Date.now();
 
-                            calibrationStep = 0; 
-                            monitoring = true;
-                            lastMovementTime = Date.now();
+                    // Calibration complete hone par phone vibrate karega (jaise 300ms ke liye vibration)
+                    if ("vibrate" in navigator) {
+                        navigator.vibrate(300);
+                    }
 
-                            document.getElementById("status").innerText = "Status: Calibration Done! Monitoring active.";
-                            document.getElementById("status").style.color = "green";
-                        }
-                    }, 4000); // 4 seconds for target
+                    document.getElementById("status").innerText = "Status: Calibration Done! Monitoring active.";
+                    document.getElementById("status").style.color = "green";
                 }
-            }, 4000); // 4 seconds for base
+            }, 1000);
         }
 
         function handleOrientation(event) {
@@ -141,29 +139,22 @@
             let rotationAngle = beta * 2;
             document.getElementById("needle").style.transform = `rotate(${rotationAngle}deg)`;
 
-            // Step 1: Base collect ho raha hai
-            if (calibrationStep === 1) {
-                baseValues.push(beta);
-                document.getElementById("debug").innerHTML = `Calibrating Base (4s)... Readings: ${baseValues.length}`;
-                return;
-            }
-
-            // Step 2: Target collect ho raha hai (Poore 4 second tak sari values aayengi)
-            if (calibrationStep === 2) {
-                targetValues.push(beta);
-                let currentLiveMax = targetValues.length > 0 ? Math.max(...targetValues) : beta;
-                document.getElementById("debug").innerHTML = `Calibrating Target (4s)... Max so far: ${currentLiveMax.toFixed(1)}`;
+            if (isCalibrating) {
+                calibrationValues.push(beta);
+                let currentMin = Math.min(...calibrationValues);
+                let currentMax = Math.max(...calibrationValues);
+                document.getElementById("debug").innerHTML = `Calibrating (30s)... Min (Base): ${currentMin.toFixed(1)} | Max (Target): ${currentMax.toFixed(1)}`;
                 return;
             }
 
             if (!monitoring) return;
 
-            document.getElementById("debug").innerHTML = `Base: ${baseBeta.toFixed(1)} | Target Max: ${targetBeta.toFixed(1)} | 70%: ${threshold70.toFixed(1)} | Current: ${beta.toFixed(1)}`;
+            document.getElementById("debug").innerHTML = `Base (Min): ${baseBeta.toFixed(1)} | Target (Max): ${targetBeta.toFixed(1)} | 70%: ${threshold70.toFixed(1)} | Current: ${beta.toFixed(1)}`;
 
             if (beta >= threshold70) {
                 lastMovementTime = Date.now();
                 document.getElementById("status").innerText = "Status: Breathing detected... Good!";
-                document.getElementById("status").style.color = "green";
+                document.getElementById("status::color"] = "green";
             }
         }
 
