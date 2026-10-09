@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Breathing Compass Alert - Perfect Max Target</title>
+    <title>Breathing Compass Alert - Timed 4s Target</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
         body { font-family: Arial, sans-serif; text-align: center; padding: 20px; background: #f4f4f9; }
@@ -61,7 +61,7 @@
 
     <script>
         let monitoring = false;
-        let calibrationStep = 0; // 1: Base (4 sec), 2: Target (4 sec)
+        let calibrationStep = 0; // 0: Idle, 1: Base (4s), 2: Target (4s)
         let baseValues = [];
         let targetValues = [];
         
@@ -98,6 +98,40 @@
             document.getElementById("status").style.color = "#d9534f";
 
             window.addEventListener('deviceorientation', handleOrientation);
+
+            // 4 seconds pure hone ke baad Step 1 complete hoga
+            setTimeout(() => {
+                if (calibrationStep === 1) {
+                    if (baseValues.length > 0) {
+                        baseBeta = baseValues.reduce((a, b) => a + b, 0) / baseValues.length;
+                    }
+                    calibrationStep = 2;
+                    document.getElementById("status").innerText = "Step 2: Ab lambi/gehri saans lein (Poore 4 seconds max lo)...";
+                    
+                    // Step 2 ke liye bhi strict 4 seconds ka timer
+                    setTimeout(() => {
+                        if (calibrationStep === 2) {
+                            if (targetValues.length > 0) {
+                                targetBeta = Math.max(...targetValues); // Poore 4s ki max value
+                            } else {
+                                targetBeta = baseBeta + 4; // Fallback
+                            }
+
+                            let totalExpansion = targetBeta - baseBeta;
+                            if (totalExpansion < 2) totalExpansion = 4; 
+                            
+                            threshold70 = baseBeta + (totalExpansion * 0.70);
+
+                            calibrationStep = 0; 
+                            monitoring = true;
+                            lastMovementTime = Date.now();
+
+                            document.getElementById("status").innerText = "Status: Calibration Done! Monitoring active.";
+                            document.getElementById("status").style.color = "green";
+                        }
+                    }, 4000); // 4 seconds for target
+                }
+            }, 4000); // 4 seconds for base
         }
 
         function handleOrientation(event) {
@@ -107,40 +141,18 @@
             let rotationAngle = beta * 2;
             document.getElementById("needle").style.transform = `rotate(${rotationAngle}deg)`;
 
-            // Step 1: Base State (4 seconds / ~40 readings)
+            // Step 1: Base collect ho raha hai
             if (calibrationStep === 1) {
                 baseValues.push(beta);
-                document.getElementById("debug").innerHTML = `Calibrating Base (4s)... Current: ${beta.toFixed(1)}`;
-                
-                if (baseValues.length === 40) {
-                    baseBeta = baseValues.reduce((a, b) => a + b, 0) / baseValues.length;
-                    calibrationStep = 2; 
-                    document.getElementById("status").innerText = "Step 2: Ab lambi/gehri saans lein (Poore 4 seconds max lo)...";
-                }
+                document.getElementById("debug").innerHTML = `Calibrating Base (4s)... Readings: ${baseValues.length}`;
                 return;
             }
 
-            // Step 2: Target State - Poore 4 seconds tak values collect karo, fir max nikalo
+            // Step 2: Target collect ho raha hai (Poore 4 second tak sari values aayengi)
             if (calibrationStep === 2) {
                 targetValues.push(beta);
-                document.getElementById("debug").innerHTML = `Calibrating Target (4s)... Readings collected: ${targetValues.length}/40`;
-                
-                if (targetValues.length === 40) {
-                    // Poore 4 seconds ki saari values me se absolute maximum value yahan niklegi
-                    targetBeta = Math.max(...targetValues); 
-
-                    let totalExpansion = targetBeta - baseBeta;
-                    if (totalExpansion < 2) totalExpansion = 4; 
-                    
-                    threshold70 = baseBeta + (totalExpansion * 0.70);
-
-                    calibrationStep = 0; 
-                    monitoring = true;
-                    lastMovementTime = Date.now();
-
-                    document.getElementById("status").innerText = "Status: Calibration Done! Monitoring active.";
-                    document.getElementById("status").style.color = "green";
-                }
+                let currentLiveMax = targetValues.length > 0 ? Math.max(...targetValues) : beta;
+                document.getElementById("debug").innerHTML = `Calibrating Target (4s)... Max so far: ${currentLiveMax.toFixed(1)}`;
                 return;
             }
 
