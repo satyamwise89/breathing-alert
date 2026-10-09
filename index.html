@@ -1,18 +1,19 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Breathing Compass Alert - 3 Sec Calibrated</title>
+    <title>Breathing Compass Alert - Scored & Calibrated</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
         body { font-family: Arial, sans-serif; text-align: center; padding: 20px; background: #f4f4f9; }
         h2 { color: #333; }
         #status { font-size: 18px; font-weight: bold; margin: 15px 0; color: #333; }
+        #score-box { font-size: 16px; font-weight: bold; color: #d9534f; margin-bottom: 15px; }
         
         .compass-container {
             position: relative;
             width: 200px;
             height: 200px;
-            margin: 30px auto;
+            margin: 20px auto;
             background: #fff;
             border: 5px solid #0275d8;
             border-radius: 50%;
@@ -47,6 +48,7 @@
 <body>
 
     <h2>Breathing Focus Compass</h2>
+    <div id="score-box">Mind Wandered Count: <span id="wanderCount">0</span> baar</div>
     <div id="status">Status: Click 'Start' to begin calibration</div>
     <button onclick="startSensor()">Start Monitoring</button>
 
@@ -59,7 +61,7 @@
 
     <script>
         let monitoring = false;
-        let calibrationStep = 0; // 1: Base recording (3 sec), 2: Deep breath recording (3 sec)
+        let calibrationStep = 0; // 1: Base (4 sec), 2: Target (4 sec)
         let baseValues = [];
         let targetValues = [];
         
@@ -67,6 +69,7 @@
         let targetBeta = 0;
         let threshold70 = 0;
 
+        let wanderCount = 0; // Score tracker
         let lastMovementTime = Date.now();
         const thresholdTime = 6000; // 6 seconds limit
 
@@ -89,7 +92,9 @@
             monitoring = false;
             baseValues = [];
             targetValues = [];
-            document.getElementById("status").innerText = "Step 1: Normal saans lein (3 seconds)...";
+            wanderCount = 0;
+            document.getElementById("wanderCount").innerText = wanderCount;
+            document.getElementById("status").innerText = "Step 1: Normal saans lein (Poore 4 seconds)...";
             document.getElementById("status").style.color = "#d9534f";
 
             window.addEventListener('deviceorientation', handleOrientation);
@@ -102,25 +107,25 @@
             let rotationAngle = beta * 2;
             document.getElementById("needle").style.transform = `rotate(${rotationAngle}deg)`;
 
-            // Step 1: Record Normal/Base State (Poore 3 seconds / ~30 readings)
+            // Step 1: Base State (4 seconds / ~40 readings)
             if (calibrationStep === 1) {
                 baseValues.push(beta);
-                document.getElementById("debug").innerHTML = `Calibrating Base (3s)... Current: ${beta.toFixed(1)}`;
+                document.getElementById("debug").innerHTML = `Calibrating Base (4s)... Current: ${beta.toFixed(1)}`;
                 
-                if (baseValues.length === 30) {
+                if (baseValues.length === 40) {
                     baseBeta = baseValues.reduce((a, b) => a + b, 0) / baseValues.length;
-                    calibrationStep = 2; // Move to Step 2
-                    document.getElementById("status").innerText = "Step 2: Ab lambi/gehri saans lein (3 seconds)...";
+                    calibrationStep = 2; 
+                    document.getElementById("status").innerText = "Step 2: Ab lambi/gehri saans lein (Poore 4 seconds)...";
                 }
                 return;
             }
 
-            // Step 2: Record Target/Max Expansion State (Poore 3 seconds / ~30 readings)
+            // Step 2: Target/Max Expansion State (4 seconds / ~40 readings)
             if (calibrationStep === 2) {
                 targetValues.push(beta);
-                document.getElementById("debug").innerHTML = `Calibrating Target (3s)... Current: ${beta.toFixed(1)}`;
+                document.getElementById("debug").innerHTML = `Calibrating Target (4s)... Current: ${beta.toFixed(1)}`;
                 
-                if (targetValues.length === 30) {
+                if (targetValues.length === 40) {
                     let maxTarget = Math.max(...targetValues); 
                     targetBeta = maxTarget;
 
@@ -150,10 +155,13 @@
             }
         }
 
+        // Timer check alert & Score Increment
         setInterval(() => {
             if (!monitoring) return;
             let currentTime = Date.now();
             if ((currentTime - lastMovementTime) > thresholdTime) {
+                wanderCount++; // Score badhega jab dhyan bhatkega
+                document.getElementById("wanderCount").innerText = wanderCount;
                 document.getElementById("status").innerText = "ALERT: Dhyan bhatak gaya! Saans par focus karein.";
                 document.getElementById("status").style.color = "red";
                 playBeep();
