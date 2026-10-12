@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Breathing Smooth Vertical Meter</title>
+    <title>Breathing Slow Motion Meter</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
         body { font-family: Arial, sans-serif; text-align: center; padding: 20px; background: #f4f4f9; }
@@ -27,7 +27,7 @@
             height: 0%;
             background: #0275d8;
             border-radius: 0 0 25px 25px;
-            /* Transition ko hata diya hai taaki real-time smooth feel aaye bina lag ke */
+            transition: height 0.1s ease-out;
         }
         #centerNum {
             font-size: 16px;
@@ -42,7 +42,7 @@
 </head>
 <body>
 
-    <h2>Breathing Smooth Vertical Meter</h2>
+    <h2>Breathing Slow Motion Meter</h2>
     <div id="score-box">Mind Wandered Count: <span id="wanderCount">0</span> baar</div>
     <div id="status">Status: Click 'Start' to begin</div>
     <button onclick="startSensor()">Start Monitoring</button>
@@ -50,7 +50,7 @@
     <div class="vertical-container">
         <div class="vertical-bar" id="vertBar"></div>
     </div>
-    <div id="centerNum">Smooth Value: 0.00</div>
+    <div id="centerNum">Tilt Value: 0.00</div>
 
     <div id="debug">Status: Waiting for start...</div>
 
@@ -69,12 +69,12 @@
         let wasBelow15 = false; 
         let lastZone = "none";  
 
-        let smoothedValue = 0; // Fluctuations ko khatam karne ke liye smoothing variable
-        const smoothingFactor = 0.15; // Jitna kam hoga, utna smooth chalega (0.05 se 0.2 tak best hai)
+        let filteredVal = 0;
+        const smoothing = 0.1; // Slow breathing ko smoothly track karne ke liye
 
         function startSensor() {
-            if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
-                DeviceMotionEvent.requestPermission().then(response => {
+            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                DeviceOrientationEvent.requestPermission().then(response => {
                     if (response === 'granted') {
                         beginCalibration();
                     } else {
@@ -93,16 +93,17 @@
             wanderCount = 0;
             shallowCount = 0;
             wasBelow15 = false;
-            smoothedValue = 0;
+            filteredVal = 0;
             document.getElementById("wanderCount").innerText = wanderCount;
             document.getElementById("status").style.color = "#d9534f";
 
-            window.addEventListener('devicemotion', handleMotion);
+            // DeviceOrientation (beta tilt) slow aur continuous saans ke liye sabse best hai
+            window.addEventListener('deviceorientation', handleOrientation);
 
             let timeLeft = 30;
             let countdownInterval = setInterval(() => {
                 if (timeLeft > 0) {
-                    document.getElementById("status").innerText = `Calibrating... Pet par flat rakh kar aaram se saans lein (${timeLeft}s remaining)`;
+                    document.getElementById("status").innerText = `Calibrating... Pet par rakh kar dheere-dhire saans lein (${timeLeft}s remaining)`;
                     timeLeft--;
                 } else {
                     clearInterval(countdownInterval);
@@ -110,12 +111,12 @@
                         baseVal = Math.min(...calibrationValues);
                         targetVal = Math.max(...calibrationValues);
                     } else {
-                        baseVal = 0.1;
-                        targetVal = 1.0;
+                        baseVal = 10;
+                        targetVal = 20;
                     }
 
                     let totalExpansion = targetVal - baseVal;
-                    if (totalExpansion < 0.05) totalExpansion = 0.3; 
+                    if (totalExpansion < 1) totalExpansion = 3; 
                     
                     threshold90 = baseVal + (totalExpansion * 0.90);
                     lowLimit15 = baseVal + (totalExpansion * 0.15);
@@ -135,40 +136,40 @@
             }, 1000);
         }
 
-        function handleMotion(event) {
-            let accelZ = event.acceleration ? event.acceleration.z : 0;
-            if (accelZ === null) accelZ = 0;
-            let currentMove = Math.abs(accelZ);
+        function handleOrientation(event) {
+            let beta = event.beta ? event.beta : 0; // Phone ka upar-neeche tilt angle
 
-            // Low-Pass Filter Formula: Sudden fluctuations ko rok kar data ko smooth banana
-            smoothedValue = (smoothedValue * (1 - smoothingFactor)) + (currentMove * smoothingFactor);
+            // Smoothing filter lagakar gradual change banate hain
+            filteredVal = (filteredVal === 0) ? beta : (filteredVal * (1 - smoothing)) + (beta * smoothing);
 
-            // Vertical Bar ke liye height calculate karein
-            let barHeight = Math.min(Math.max((smoothedValue / 0.8) * 100, 0), 100);
+            // Bar ke liye height percentage nikalna
+            let range = (targetVal - baseVal) || 5;
+            let barHeight = Math.min(Math.max(((filteredVal - baseVal) / range) * 100, 0), 100);
+            
             document.getElementById("vertBar").style.height = barHeight + "%";
-            document.getElementById("centerNum").innerText = "Smooth Value: " + smoothedValue.toFixed(3);
+            document.getElementById("centerNum").innerText = "Value: " + filteredVal.toFixed(2);
 
             if (isCalibrating) {
-                calibrationValues.push(smoothedValue);
+                calibrationValues.push(filteredVal);
                 let currentMin = Math.min(...calibrationValues);
                 let currentMax = Math.max(...calibrationValues);
-                document.getElementById("debug").innerHTML = `Calibrating (30s)... Min: ${currentMin.toFixed(3)} | Max: ${currentMax.toFixed(3)}`;
+                document.getElementById("debug").innerHTML = `Calibrating (30s)... Min: ${currentMin.toFixed(1)} | Max: ${currentMax.toFixed(1)}`;
                 return;
             }
 
             if (!monitoring) return;
 
-            document.getElementById("debug").innerHTML = `Base: ${baseVal.toFixed(3)} | 15%: ${lowLimit15.toFixed(3)} | 90%: ${threshold90.toFixed(3)} | Shallow Count: <b>${shallowCount}</b>`;
+            document.getElementById("debug").innerHTML = `Base: ${baseVal.toFixed(1)} | 15%: ${lowLimit15.toFixed(1)} | 90%: ${threshold90.toFixed(1)} | Shallow Count: <b>${shallowCount}</b>`;
 
             // 1. Low Zone (< 15% expansion / Stillness)
-            if (smoothedValue < lowLimit15) {
+            if (filteredVal < lowLimit15) {
                 wasBelow15 = true; 
                 lastZone = "low";
                 document.getElementById("status").innerText = "Status: Deep Stillness / Retention (<15%)";
                 document.getElementById("status").style.color = "purple";
             } 
             // 2. High Zone (>= 90% expansion / Deep Breath) -> Smart Reset
-            else if (smoothedValue >= threshold90) {
+            else if (filteredVal >= threshold90) {
                 wasBelow15 = false;
                 shallowCount = 0; 
                 lastZone = "high";
