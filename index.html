@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Breathing Compass Alert - Smart Reset Rule</title>
+    <title>Breathing Motion Alert - Up/Down Movement</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
         body { font-family: Arial, sans-serif; text-align: center; padding: 20px; background: #f4f4f9; }
@@ -59,7 +59,7 @@
 </head>
 <body>
 
-    <h2>Breathing Focus Compass</h2>
+    <h2>Breathing Motion Compass</h2>
     <div id="score-box">Mind Wandered Count: <span id="wanderCount">0</span> baar</div>
     <div id="status">Status: Click 'Start' to begin</div>
     <button onclick="startSensor()">Start Monitoring</button>
@@ -77,19 +77,20 @@
         let isCalibrating = false;
         let calibrationValues = [];
         
-        let baseBeta = 0;
-        let targetBeta = 0;
+        let baseVal = 0;
+        let targetVal = 0;
         let threshold90 = 0;
         let lowLimit15 = 0;
 
         let wanderCount = 0; 
-        let shallowCount = 0;   // 15% se niche jaakar upar aane ka count
-        let wasBelow15 = false; // Track karega ki value pehle 15% se niche gayi thi ya nahi
-        let lastZone = "none";  // "low", "middle", "high"
+        let shallowCount = 0;   
+        let wasBelow15 = false; 
+        let lastZone = "none";  
 
         function startSensor() {
-            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-                DeviceOrientationEvent.requestPermission().then(response => {
+            // iOS aur modern browsers ke liye DeviceMotion permission check
+            if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+                DeviceMotionEvent.requestPermission().then(response => {
                     if (response === 'granted') {
                         beginCalibration();
                     } else {
@@ -111,28 +112,29 @@
             document.getElementById("wanderCount").innerText = wanderCount;
             document.getElementById("status").style.color = "#d9534f";
 
-            window.addEventListener('deviceorientation', handleOrientation);
+            // DeviceMotion listener for Z-axis upward/downward movement
+            window.addEventListener('devicemotion', handleMotion);
 
             let timeLeft = 30;
             let countdownInterval = setInterval(() => {
                 if (timeLeft > 0) {
-                    document.getElementById("status").innerText = `Calibrating... Normal aur gehri saans lete rahein (${timeLeft}s remaining)`;
+                    document.getElementById("status").innerText = `Calibrating... Pet par flat rakh kar normal aur gehri saans lein (${timeLeft}s remaining)`;
                     timeLeft--;
                 } else {
                     clearInterval(countdownInterval);
                     if (calibrationValues.length > 0) {
-                        baseBeta = Math.min(...calibrationValues);
-                        targetBeta = Math.max(...calibrationValues);
+                        baseVal = Math.min(...calibrationValues);
+                        targetVal = Math.max(...calibrationValues);
                     } else {
-                        baseBeta = 10;
-                        targetBeta = 20;
+                        baseVal = 9.8;
+                        targetVal = 10.5;
                     }
 
-                    let totalExpansion = targetBeta - baseBeta;
-                    if (totalExpansion < 2) totalExpansion = 4; 
+                    let totalExpansion = targetVal - baseVal;
+                    if (totalExpansion < 0.1) totalExpansion = 0.5; // Safety fallback
                     
-                    threshold90 = baseBeta + (totalExpansion * 0.90);
-                    lowLimit15 = baseBeta + (totalExpansion * 0.15);
+                    threshold90 = baseVal + (totalExpansion * 0.90);
+                    lowLimit15 = baseVal + (totalExpansion * 0.15);
 
                     isCalibrating = false;
                     monitoring = true;
@@ -149,51 +151,52 @@
             }, 1000);
         }
 
-        function handleOrientation(event) {
-            let beta = event.beta ? event.beta : 0;
-            let gamma = event.gamma ? event.gamma : 0;
+        function handleMotion(event) {
+            // Z-axis acceleration (pet ke upar-neeche hone par gravity ke sath value badalti/ghatati hai)
+            let zAxis = event.accelerationIncludingGravity ? event.accelerationIncludingGravity.z : 0;
+            if (zAxis === null) zAxis = 0;
 
-            let rotationAngle = beta * 2;
+            // Needle rotation visual feedback ke liye (zAxis ko scale karke)
+            let rotationAngle = (zAxis - 9.8) * 30; 
             document.getElementById("needle").style.transform = `rotate(${rotationAngle}deg)`;
-            document.getElementById("centerNum").innerText = beta.toFixed(1);
+            document.getElementById("centerNum").innerText = zAxis.toFixed(2);
 
             if (isCalibrating) {
-                calibrationValues.push(beta);
+                calibrationValues.push(zAxis);
                 let currentMin = Math.min(...calibrationValues);
                 let currentMax = Math.max(...calibrationValues);
-                document.getElementById("debug").innerHTML = `Calibrating (30s)... Min: ${currentMin.toFixed(1)} | Max: ${currentMax.toFixed(1)} | Current: ${beta.toFixed(1)}`;
+                document.getElementById("debug").innerHTML = `Calibrating (30s)... Min: ${currentMin.toFixed(2)} | Max: ${currentMax.toFixed(2)} | Current: ${zAxis.toFixed(2)}`;
                 return;
             }
 
             if (!monitoring) return;
 
-            document.getElementById("debug").innerHTML = `Base: ${baseBeta.toFixed(1)} | 15%: ${lowLimit15.toFixed(1)} | 90%: ${threshold90.toFixed(1)} | Shallow Count: <b>${shallowCount}</b>`;
+            document.getElementById("debug").innerHTML = `Base: ${baseVal.toFixed(2)} | 15%: ${lowLimit15.toFixed(2)} | 90%: ${threshold90.toFixed(2)} | Shallow Count: <b>${shallowCount}</b>`;
 
-            // 1. Low Zone (< 15%): Stillness / Breath Retention
-            if (beta < lowLimit15) {
-                wasBelow15 = true; // Mark kar liya ki value 15% se niche gayi thi
+            // 1. Low Zone (< 15% expansion / Stillness)
+            if (zAxis < lowLimit15) {
+                wasBelow15 = true; 
                 lastZone = "low";
                 document.getElementById("status").innerText = "Status: Deep Stillness / Retention (<15%)";
                 document.getElementById("status").style.color = "purple";
             } 
-            // 2. High Zone (>= 90%): Deep Breath -> Good! Yahan count turant 0 ho jayega (Smart Reset)
-            else if (beta >= threshold90) {
+            // 2. High Zone (>= 90% expansion / Deep Breath) -> Smart Reset
+            else if (zAxis >= threshold90) {
                 wasBelow15 = false;
-                shallowCount = 0; // Agar beech mein acchi saans aa gayi, toh count reset ho kar 0 ho jayega
+                shallowCount = 0; 
                 lastZone = "high";
                 document.getElementById("status").innerText = "Status: Deep Breath Detected... Good! (>=90%)";
                 document.getElementById("status").style.color = "green";
             } 
-            // 3. Middle Zone (15% se upar AUR 90% se kam): Danger / Shallow Zone
+            // 3. Middle Zone (15% - 90% danger zone)
             else {
-                // Agar value pehle <15% thi aur ab middle zone mein aayi hai, matlab ek shallow cycle poori hui
                 if (wasBelow15 && lastZone !== "middle") {
-                    shallowCount++; // Count 1 se badh gaya
-                    wasBelow15 = false; // Flag reset agli cycle ke liye
+                    shallowCount++; 
+                    wasBelow15 = false; 
                 }
                 lastZone = "middle";
 
-                // AGAR 2 SE ZYADA BAR LAGATAAR SHALLOW BREATHING HO GAYI HAI
+                // Agar lagataar 2 baar shallow breathing ho gayi hai toh beep bajegi
                 if (shallowCount > 2) {
                     wanderCount++;
                     document.getElementById("wanderCount").innerText = wanderCount;
@@ -201,7 +204,6 @@
                     document.getElementById("status").style.color = "red";
                     playBeep();
                     
-                    // Logic reset taaki agli baar fir se count zero se shuru ho sake
                     shallowCount = 0; 
                 } else {
                     document.getElementById("status").innerText = `Status: Shallow Breathing (Count: ${shallowCount}/2)`;
