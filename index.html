@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Breathing Motion Alert - Up/Down Movement</title>
+    <title>Breathing Vertical Motion Bar</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
         body { font-family: Arial, sans-serif; text-align: center; padding: 20px; background: #f4f4f9; }
@@ -9,48 +9,34 @@
         #status { font-size: 18px; font-weight: bold; margin: 15px 0; color: #333; }
         #score-box { font-size: 16px; font-weight: bold; color: #d9534f; margin-bottom: 15px; }
         
-        .compass-container {
+        /* Compass ki jagah ek Vertical Line / Bar Container */
+        .vertical-container {
             position: relative;
-            width: 200px;
-            height: 200px;
+            width: 40px;
+            height: 220px;
             margin: 20px auto;
-            background: #fff;
-            border: 5px solid #0275d8;
-            border-radius: 50%;
+            background: #e0e0e0;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: inset 0 2px 5px rgba(0,0,0,0.2);
             display: flex;
-            align-items: center;
+            align-items: flex-end;
             justify-content: center;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
         }
-        .needle {
-            position: absolute;
-            width: 6px;
-            height: 90px;
-            background: #d9534f;
-            top: 10px;
-            left: calc(50% - 3px);
-            border-radius: 3px;
-            transform-origin: bottom center;
-            transition: transform 0.1s ease-out;
-            z-index: 2;
+        /* Yeh bar upar niche move karega saans ke sath */
+        .vertical-bar {
+            width: 100%;
+            height: 0%;
+            background: #0275d8;
+            border-radius: 0 0 20px 20px;
+            transition: height 0.05s ease-out;
         }
-        .center-number {
-            position: absolute;
-            font-size: 14px;
+        /* Center number bar ke upar ya niche live dikhega */
+        #centerNum {
+            font-size: 16px;
             font-weight: bold;
             color: #333;
-            background: rgba(255, 255, 255, 0.9);
-            padding: 4px 8px;
-            border-radius: 10px;
-            z-index: 3;
-            bottom: 50px;
-        }
-        .center-dot {
-            width: 12px;
-            height: 12px;
-            background: #333;
-            border-radius: 50%;
-            z-index: 2;
+            margin: 10px 0;
         }
 
         #debug { font-size: 14px; color: #555; background: #fff; padding: 10px; border-radius: 5px; margin-top: 15px; border: 1px solid #ccc; }
@@ -59,16 +45,16 @@
 </head>
 <body>
 
-    <h2>Breathing Motion Compass</h2>
+    <h2>Breathing Vertical Motion Meter</h2>
     <div id="score-box">Mind Wandered Count: <span id="wanderCount">0</span> baar</div>
     <div id="status">Status: Click 'Start' to begin</div>
     <button onclick="startSensor()">Start Monitoring</button>
 
-    <div class="compass-container">
-        <div class="needle" id="needle"></div>
-        <div class="center-number" id="centerNum">0.0</div>
-        <div class="center-dot"></div>
+    <!-- Vertical Line / Meter Container -->
+    <div class="vertical-container">
+        <div class="vertical-bar" id="vertBar"></div>
     </div>
+    <div id="centerNum">Value: 0.00</div>
 
     <div id="debug">Status: Waiting for start...</div>
 
@@ -88,7 +74,6 @@
         let lastZone = "none";  
 
         function startSensor() {
-            // iOS aur modern browsers ke liye DeviceMotion permission check
             if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
                 DeviceMotionEvent.requestPermission().then(response => {
                     if (response === 'granted') {
@@ -112,13 +97,13 @@
             document.getElementById("wanderCount").innerText = wanderCount;
             document.getElementById("status").style.color = "#d9534f";
 
-            // DeviceMotion listener for Z-axis upward/downward movement
+            // Pure linear acceleration bina gravity ke (sirf real up/down movement ke liye)
             window.addEventListener('devicemotion', handleMotion);
 
             let timeLeft = 30;
             let countdownInterval = setInterval(() => {
                 if (timeLeft > 0) {
-                    document.getElementById("status").innerText = `Calibrating... Pet par flat rakh kar normal aur gehri saans lein (${timeLeft}s remaining)`;
+                    document.getElementById("status").innerText = `Calibrating... Pet par flat rakh kar saans lein (${timeLeft}s remaining)`;
                     timeLeft--;
                 } else {
                     clearInterval(countdownInterval);
@@ -126,12 +111,12 @@
                         baseVal = Math.min(...calibrationValues);
                         targetVal = Math.max(...calibrationValues);
                     } else {
-                        baseVal = 9.8;
-                        targetVal = 10.5;
+                        baseVal = 0.0;
+                        targetVal = 0.5;
                     }
 
                     let totalExpansion = targetVal - baseVal;
-                    if (totalExpansion < 0.1) totalExpansion = 0.5; // Safety fallback
+                    if (totalExpansion < 0.05) totalExpansion = 0.2; // Safety fallback
                     
                     threshold90 = baseVal + (totalExpansion * 0.90);
                     lowLimit15 = baseVal + (totalExpansion * 0.15);
@@ -152,20 +137,23 @@
         }
 
         function handleMotion(event) {
-            // Z-axis acceleration (pet ke upar-neeche hone par gravity ke sath value badalti/ghatati hai)
-            let zAxis = event.accelerationIncludingGravity ? event.accelerationIncludingGravity.z : 0;
-            if (zAxis === null) zAxis = 0;
+            // event.acceleration (bina gravity ke) seedha physical movement (push up/down) maapta hai
+            let accelZ = event.acceleration ? event.acceleration.z : 0;
+            if (accelZ === null) accelZ = 0;
 
-            // Needle rotation visual feedback ke liye (zAxis ko scale karke)
-            let rotationAngle = (zAxis - 9.8) * 30; 
-            document.getElementById("needle").style.transform = `rotate(${rotationAngle}deg)`;
-            document.getElementById("centerNum").innerText = zAxis.toFixed(2);
+            // Agar value negative bhi aaye toh magnitude ya absolute le sakte hain ya seedha track kar sakte hain
+            let currentMove = Math.abs(accelZ);
+
+            // Vertical Bar ko animate karne ke liye percentage calculate karein (0 se 100%)
+            let barHeight = Math.min(Math.max((currentMove / 1.5) * 100, 0), 100);
+            document.getElementById("vertBar").style.height = barHeight + "%";
+            document.getElementById("centerNum").innerText = "Movement: " + currentMove.toFixed(2);
 
             if (isCalibrating) {
-                calibrationValues.push(zAxis);
+                calibrationValues.push(currentMove);
                 let currentMin = Math.min(...calibrationValues);
                 let currentMax = Math.max(...calibrationValues);
-                document.getElementById("debug").innerHTML = `Calibrating (30s)... Min: ${currentMin.toFixed(2)} | Max: ${currentMax.toFixed(2)} | Current: ${zAxis.toFixed(2)}`;
+                document.getElementById("debug").innerHTML = `Calibrating (30s)... Min: ${currentMin.toFixed(2)} | Max: ${currentMax.toFixed(2)}`;
                 return;
             }
 
@@ -174,14 +162,14 @@
             document.getElementById("debug").innerHTML = `Base: ${baseVal.toFixed(2)} | 15%: ${lowLimit15.toFixed(2)} | 90%: ${threshold90.toFixed(2)} | Shallow Count: <b>${shallowCount}</b>`;
 
             // 1. Low Zone (< 15% expansion / Stillness)
-            if (zAxis < lowLimit15) {
+            if (currentMove < lowLimit15) {
                 wasBelow15 = true; 
                 lastZone = "low";
                 document.getElementById("status").innerText = "Status: Deep Stillness / Retention (<15%)";
                 document.getElementById("status").style.color = "purple";
             } 
             // 2. High Zone (>= 90% expansion / Deep Breath) -> Smart Reset
-            else if (zAxis >= threshold90) {
+            else if (currentMove >= threshold90) {
                 wasBelow15 = false;
                 shallowCount = 0; 
                 lastZone = "high";
@@ -196,7 +184,6 @@
                 }
                 lastZone = "middle";
 
-                // Agar lagataar 2 baar shallow breathing ho gayi hai toh beep bajegi
                 if (shallowCount > 2) {
                     wanderCount++;
                     document.getElementById("wanderCount").innerText = wanderCount;
